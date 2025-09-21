@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>我的文章庫</title>
+  <title>我的文章庫（iframe 版）</title>
   <style>
     :root{
       --bg:#0b1220;--panel:#0f172a;--panel-2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--border:#1f2a44;--hover:#15213a;
@@ -16,7 +16,6 @@
     header h1{font-size:18px;margin:0;font-weight:600}
     header .search{flex:1;max-width:720px;display:flex;gap:8px}
     input[type="search"]{flex:1;background:#0a1223;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text)}
-    .wrap{display:flex;min-height:0}
     aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto}
     main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:auto}
 
@@ -41,15 +40,16 @@
     .breadcrumbs a{color:var(--muted);text-decoration:none}
     .breadcrumbs a:hover{color:var(--text)}
     h2.article-title{margin:8px 0 16px;font-size:26px}
-    article{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-    article img{max-width:100%;border-radius:8px}
-    article pre{overflow:auto;background:#0a1223;border:1px solid var(--border);padding:12px;border-radius:10px}
-    article code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace}
-
-    /* Toolbar */
     .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:6px 0 16px}
     .btn{background:#0a1223;border:1px solid var(--border);padding:8px 10px;border-radius:10px;color:var(--text);cursor:pointer}
     .btn:hover{background:#0d1830}
+
+    /* Iframe container */
+    #articleFrame{width:100%;border:0;min-height:420px;background:#0b1326;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .welcome{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+    /* Visitor counter */
+    .visitor-counter{margin-top:16px;font-size:14px;color:var(--muted);text-align:right}
 
     /* Responsive */
     .toggle{display:none}
@@ -87,61 +87,61 @@
           <button class="btn" id="openRaw">在新分頁開啟原始檔</button>
           <button class="btn" id="copyLink">複製目前連結</button>
         </div>
-        <article id="article">
-          <p>左側是「類檔案總管」的選單。點分類可展開，點文章會在這裡載入內容。</p>
-          <p>你可以把文章寫成 <strong>.html</strong> 檔放在 <code>/articles</code> 資料夾，然後只要改下面的 <code>manifest</code> 就行了。</p>
+
+        <!-- 初始歡迎卡片（尚未選文章時顯示） -->
+        <div id="welcome" class="welcome">
+          <p>左側是「類檔案總管」的選單。點分類可展開，點文章會在下方的 iframe 載入內容（文章自帶 CSS/JS 彼此隔離，不會影響版面）。</p>
           <pre><code>articles/
   getting-started.html
   web/pcloud-deploy.html
   life/reading-notes.html
 </code></pre>
-        </article>
+        </div>
+
+        <!-- 文章 iframe：選擇文章後才會顯示 -->
+        <iframe id="articleFrame" title="文章內容" style="display:none"></iframe>
+
+        <!-- Disqus 留言（會依目前文章 path 重設） -->
+        <div id="disqus_thread" style="margin-top:24px;"></div>
+        <noscript>請啟用 JavaScript 以檢視 <a href="https://disqus.com/" rel="nofollow">Disqus 留言區</a></noscript>
+
+        <!-- 訪客人數（依目前文章 path 計數） -->
+        <div class="visitor-counter">訪客人數：<span id="visitorCount">—</span></div>
       </div>
     </main>
   </div>
 
   <script>
-    // === 1) 站點清單（你只要改這裡）=========================================
-    // type Manifest = Array<Category>
-    // type Category = { name: string, children: Array<Category|Item> }
-    // type Item = { title: string, path: string }
+    // ===== 1) 站點清單（你只要改這裡） ======================================
     const manifest = [
-      {
-        name: "入門",
-        children: [
-          { title: "開始使用本模板", path: "articles/getting-started.html" },
-          { title: "如何上傳到 pCloud", path: "articles/pcloud-deploy.html" },
-        ],
-      },
-      {
-        name: "Web 開發",
-        children: [
-          { title: "排版與框架選擇", path: "articles/layout-frameworks.html" },
-          { title: "小技巧：圖片最佳化", path: "articles/image-optim.html" },
-        ],
-      },
-      {
-        name: "生活記錄",
-        children: [
-          {
-            name: "讀書摘錄",
-            children: [
-              { title: "原子習慣筆記", path: "articles/life/atomic-habits.html" },
-              { title: "深度工作重點", path: "articles/life/deep-work.html" },
-            ],
-          },
-        ],
-      },
+      { name: '入門', children: [
+        { title: '開始使用本模板', path: 'articles/getting-started.html' },
+        { title: '如何上傳到 pCloud', path: 'articles/pcloud-deploy.html' },
+      ]},
+      { name: 'Web 開發', children: [
+        { title: '排版與框架選擇', path: 'articles/layout-frameworks.html' },
+        { title: '小技巧：圖片最佳化', path: 'articles/image-optim.html' },
+      ]},
+      { name: '生活記錄', children: [
+        { name: '讀書摘錄', children: [
+          { title: '原子習慣筆記', path: 'articles/life/atomic-habits.html' },
+          { title: '深度工作重點', path: 'articles/life/deep-work.html' },
+        ]},
+      ]},
     ];
 
-    // === 2) UI 建置 ==========================================================
+    // ===== 2) UI 元件 =======================================================
     const treeRoot = document.getElementById('treeRoot');
-    const article = document.getElementById('article');
-    const articleTitle = document.getElementById('articleTitle');
     const breadcrumbs = document.getElementById('breadcrumbs');
+    const articleTitle = document.getElementById('articleTitle');
     const openRawBtn = document.getElementById('openRaw');
     const copyLinkBtn = document.getElementById('copyLink');
     const sidebar = document.getElementById('sidebar');
+    const welcome = document.getElementById('welcome');
+    const frame = document.getElementById('articleFrame');
+    const visitorCountEl = document.getElementById('visitorCount');
+
+    let currentPath = null; // 目前文章路徑（給 Disqus / CountAPI 使用）
 
     function createCategoryNode(cat, pathTrail=[]) {
       const li = document.createElement('li');
@@ -214,45 +214,88 @@
       manifest.forEach(cat=> treeRoot.appendChild(createCategoryNode(cat)));
     }
 
-    // === 3) 載入文章 + 導覽 ==================================================
+    // ===== 3) 載入文章（iframe 版） + 導覽 ==================================
     async function loadArticle(title, path, trail){
+      currentPath = path;
       setRoute(path);
       breadcrumbs.innerHTML = ['<a href="#" data-home>首頁</a>']
         .concat(trail.map(t=>`<span> / </span><span>${escapeHtml(t)}</span>`))
         .concat([`<span> / </span><span>${escapeHtml(title)}</span>`])
         .join('');
       articleTitle.textContent = title;
+
+      // 顯示 iframe、隱藏歡迎卡
+      welcome.style.display = 'none';
+      frame.style.display = 'block';
+
+      // 載入文章檔案
+      frame.src = path + cacheBust();
+      frame.onload = () => {
+        // 同網域時自動高度
+        try {
+          const doc = frame.contentWindow.document;
+          const h = Math.max(
+            doc.body.scrollHeight,
+            doc.documentElement.scrollHeight
+          );
+          frame.style.height = Math.max(420, h + 20) + 'px';
+        } catch (e) {
+          // 跨網域：給個視窗高度
+          frame.style.height = '80vh';
+        }
+      };
+
+      // 按鈕
       openRawBtn.onclick = ()=> window.open(path, '_blank');
       copyLinkBtn.onclick = ()=>{
         navigator.clipboard.writeText(location.href).then(()=>{
           copyLinkBtn.textContent = '已複製！';
           setTimeout(()=>copyLinkBtn.textContent='複製目前連結',1000);
         });
-      }
-      try{
-        const res = await fetch(path + cacheBust());
-        const html = await res.text();
-        article.innerHTML = html;
-      }catch(e){
-        article.innerHTML = `<p style="color:#fca5a5">無法載入文章：${escapeHtml(String(e))}</p>`;
+      };
+
+      // 更新 Disqus 與 來訪人次
+      updateDisqus(location.href, path);
+      updateVisitorCounter(path);
+    }
+
+    // ===== Disqus：依目前文章重設 ===========================================
+    const DISQUS_SHORTNAME = '你的短名稱'; // ← 改成你的 Disqus 短名稱
+    (function(){
+      // 初次載入 Disqus 腳本
+      const d = document, s = d.createElement('script');
+      s.src = 'https://' + DISQUS_SHORTNAME + '.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', +new Date());
+      (d.head || d.body).appendChild(s);
+    })();
+
+    function updateDisqus(pageUrl, identifier){
+      if (window.DISQUS){
+        window.DISQUS.reset({
+          reload: true,
+          config: function () {
+            this.page.url = pageUrl;      // 目前頁面網址（含 ?path=）
+            this.page.identifier = identifier; // 以文章 path 當唯一 ID
+          }
+        });
+      } else {
+        // 若腳本尚未就緒，稍後再試一次
+        setTimeout(()=> updateDisqus(pageUrl, identifier), 400);
       }
     }
 
-    // 路由：支援網址 ?path=articles/xxx.html 直接開啟
-    function getParam(name){
-      const u = new URL(location.href);
-      return u.searchParams.get(name);
-    }
-    function setRoute(path){
-      const u = new URL(location.href);
-      if (path) u.searchParams.set('path', path); else u.searchParams.delete('path');
-      history.replaceState({}, '', u);
-    }
-    function cacheBust(){
-      return (location.hostname.endsWith('pcloud.link')? `?v=${Date.now()}` : '');
+    // ===== 訪客人數（CountAPI：每篇文章各自累計） ==========================
+    const COUNT_NAMESPACE = 'myblog'; // ← 依需求自訂命名空間
+    function updateVisitorCounter(path){
+      const key = encodeURIComponent(path || 'home');
+      const url = `https://api.countapi.xyz/hit/${COUNT_NAMESPACE}/${key}`;
+      fetch(url)
+        .then(r=>r.json())
+        .then(d=>{ visitorCountEl.textContent = d.value; })
+        .catch(()=>{ visitorCountEl.textContent = '無法取得'; });
     }
 
-    // === 4) 搜尋（即時過濾） =================================================
+    // ===== 4) 搜尋（即時過濾） ==============================================
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', ()=>{
       const q = searchInput.value.trim().toLowerCase();
@@ -260,7 +303,6 @@
     });
 
     function filterTree(q){
-      // 顯示包含關鍵字的節點，並展開其父層
       const files = treeRoot.querySelectorAll('.file');
       files.forEach(li=>{
         const match = li.dataset.title.toLowerCase().includes(q);
@@ -277,13 +319,12 @@
       });
     }
 
-    // === 5) 初始化 ============================================================
+    // ===== 5) 初始化 =========================================================
     buildTree();
 
     // 如果網址有指定 path，就直接載入
     const startPath = getParam('path');
     if (startPath){
-      // 找到對應的標題 & trail
       function findItem(nodes, trail=[]){
         for(const n of nodes){
           if(n.path && n.path===startPath) return {title:n.title, trail};
@@ -297,10 +338,15 @@
       const found = findItem(manifest);
       if(found){
         loadArticle(found.title, startPath, found.trail);
-        // 同步選單 active
         const target = [...document.querySelectorAll('.file')].find(li=>li.dataset.path===startPath);
         target && target.classList.add('active');
+      } else {
+        // 若網址 path 找不到對應項目，也至少更新計數器為首頁
+        updateVisitorCounter(null);
       }
+    } else {
+      // 初次載入首頁：給首頁一個訪客計數
+      updateVisitorCounter(null);
     }
 
     // 展開/收合全部
@@ -326,10 +372,27 @@
       setRoute(null);
       articleTitle.textContent = '歡迎！';
       breadcrumbs.textContent = '首頁';
-      article.innerHTML = '<p>選單中選擇一篇文章開始閱讀。</p>';
+      frame.style.display = 'none';
+      welcome.style.display = 'block';
       document.querySelectorAll('.file.active').forEach(n=>n.classList.remove('active'));
+      currentPath = null;
+      updateDisqus(location.href, 'home');
+      updateVisitorCounter(null);
     });
 
+    // 小工具們
+    function getParam(name){
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    function setRoute(path){
+      const u = new URL(location.href);
+      if (path) u.searchParams.set('path', path); else u.searchParams.delete('path');
+      history.replaceState({}, '', u);
+    }
+    function cacheBust(){
+      return (location.hostname.endsWith('pcloud.link')? `?v=${Date.now()}` : '');
+    }
     function escapeHtml(s){
       return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
     }
