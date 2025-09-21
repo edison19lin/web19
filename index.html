@@ -3,11 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>我的文章庫（iframe 版）</title>
+  <title>電火發明家</title>
   <style>
-    :root{
-      --bg:#0b1220;--panel:#0f172a;--panel-2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--border:#1f2a44;--hover:#15213a;
-    }
+    :root{ --bg:#0b1220;--panel:#0f172a;--panel-2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--border:#1f2a44;--hover:#15213a; }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif}
@@ -47,9 +45,6 @@
     /* Iframe container */
     #articleFrame{width:100%;border:0;min-height:420px;background:#0b1326;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
     .welcome{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-
-    /* Visitor counter */
-    .visitor-counter{margin-top:16px;font-size:14px;color:var(--muted);text-align:right}
 
     /* Responsive */
     .toggle{display:none}
@@ -91,11 +86,14 @@
         <!-- 初始歡迎卡片（尚未選文章時顯示） -->
         <div id="welcome" class="welcome">
           <p>左側是「類檔案總管」的選單。點分類可展開，點文章會在下方的 iframe 載入內容（文章自帶 CSS/JS 彼此隔離，不會影響版面）。</p>
-          <pre><code>articles/
-  getting-started.html
-  web/pcloud-deploy.html
-  life/reading-notes.html
-</code></pre>
+          <pre><code>personal/
+  intro.html
+  genealogy.html
+  photos.html
+notes/
+  c/index.html
+  python/index.html
+  vscode/index.html</code></pre>
         </div>
 
         <!-- 文章 iframe：選擇文章後才會顯示 -->
@@ -104,29 +102,22 @@
         <!-- Disqus 留言（會依目前文章 path 重設） -->
         <div id="disqus_thread" style="margin-top:24px;"></div>
         <noscript>請啟用 JavaScript 以檢視 <a href="https://disqus.com/" rel="nofollow">Disqus 留言區</a></noscript>
-
-        <!-- 訪客人數（依目前文章 path 計數） -->
-        <div class="visitor-counter">訪客人數：<span id="visitorCount">—</span></div>
       </div>
     </main>
   </div>
 
   <script>
-    // ===== 1) 站點清單（你只要改這裡） ======================================
+    // ===== 1) 站點清單（這裡填你的分類/頁面） ===============================
     const manifest = [
-      { name: '入門', children: [
-        { title: '開始使用本模板', path: 'articles/getting-started.html' },
-        { title: '如何上傳到 pCloud', path: 'articles/pcloud-deploy.html' },
+      { name: '個人相關資料', children: [
+        { title: '個人介紹', path: 'personal/intro.html' },
+        { title: '祖譜（家族樹）', path: 'personal/genealogy.html' },
+        { title: '照片相簿', path: 'personal/photos.html' },
       ]},
-      { name: 'Web 開發', children: [
-        { title: '排版與框架選擇', path: 'articles/layout-frameworks.html' },
-        { title: '小技巧：圖片最佳化', path: 'articles/image-optim.html' },
-      ]},
-      { name: '生活記錄', children: [
-        { name: '讀書摘錄', children: [
-          { title: '原子習慣筆記', path: 'articles/life/atomic-habits.html' },
-          { title: '深度工作重點', path: 'articles/life/deep-work.html' },
-        ]},
+      { name: '技術筆記', children: [
+        { title: 'C 語言', path: 'notes/c/index.html' },
+        { title: 'Python', path: 'notes/python/index.html' },
+        { title: 'VS Code', path: 'notes/vscode/index.html' },
       ]},
     ];
 
@@ -139,9 +130,8 @@
     const sidebar = document.getElementById('sidebar');
     const welcome = document.getElementById('welcome');
     const frame = document.getElementById('articleFrame');
-    const visitorCountEl = document.getElementById('visitorCount');
 
-    let currentPath = null; // 目前文章路徑（給 Disqus / CountAPI 使用）
+    let currentPath = null; // 目前文章路徑（給 Disqus 使用）
 
     function createCategoryNode(cat, pathTrail=[]) {
       const li = document.createElement('li');
@@ -216,7 +206,7 @@
 
     // ===== 3) 載入文章（iframe 版） + 導覽 ==================================
     async function loadArticle(title, path, trail){
-      currentPath = path;
+      currentPath = path; window.currentPath = path; // 給 disqus_config 使用
       setRoute(path);
       breadcrumbs.innerHTML = ['<a href="#" data-home>首頁</a>']
         .concat(trail.map(t=>`<span> / </span><span>${escapeHtml(t)}</span>`))
@@ -234,10 +224,7 @@
         // 同網域時自動高度
         try {
           const doc = frame.contentWindow.document;
-          const h = Math.max(
-            doc.body.scrollHeight,
-            doc.documentElement.scrollHeight
-          );
+          const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
           frame.style.height = Math.max(420, h + 20) + 'px';
         } catch (e) {
           // 跨網域：給個視窗高度
@@ -254,12 +241,16 @@
         });
       };
 
-      // 更新 Disqus 與 來訪人次
+      // 更新 Disqus（已移除訪客計數）
       updateDisqus(location.href, path);
-      updateVisitorCounter(path);
     }
 
     // ===== Disqus：依目前文章重設 ===========================================
+    // 先提供全域 disqus_config（必須在 embed.js 載入前定義）
+    window.disqus_config = function () {
+      this.page.url = location.href;
+      this.page.identifier = window.currentPath || 'home';
+    };
     const DISQUS_SHORTNAME = 'edison19lin'; // ← 改成你的 Disqus 短名稱
     (function(){
       // 初次載入 Disqus 腳本
@@ -282,17 +273,6 @@
         // 若腳本尚未就緒，稍後再試一次
         setTimeout(()=> updateDisqus(pageUrl, identifier), 400);
       }
-    }
-
-    // ===== 訪客人數（CountAPI：每篇文章各自累計） ==========================
-    const COUNT_NAMESPACE = 'myblog'; // ← 依需求自訂命名空間
-    function updateVisitorCounter(path){
-      const key = encodeURIComponent(path || 'home');
-      const url = `https://api.countapi.xyz/hit/${COUNT_NAMESPACE}/${key}`;
-      fetch(url)
-        .then(r=>r.json())
-        .then(d=>{ visitorCountEl.textContent = d.value; })
-        .catch(()=>{ visitorCountEl.textContent = '無法取得'; });
     }
 
     // ===== 4) 搜尋（即時過濾） ==============================================
@@ -340,13 +320,7 @@
         loadArticle(found.title, startPath, found.trail);
         const target = [...document.querySelectorAll('.file')].find(li=>li.dataset.path===startPath);
         target && target.classList.add('active');
-      } else {
-        // 若網址 path 找不到對應項目，也至少更新計數器為首頁
-        updateVisitorCounter(null);
       }
-    } else {
-      // 初次載入首頁：給首頁一個訪客計數
-      updateVisitorCounter(null);
     }
 
     // 展開/收合全部
@@ -375,27 +349,15 @@
       frame.style.display = 'none';
       welcome.style.display = 'block';
       document.querySelectorAll('.file.active').forEach(n=>n.classList.remove('active'));
-      currentPath = null;
+      currentPath = null; window.currentPath = 'home';
       updateDisqus(location.href, 'home');
-      updateVisitorCounter(null);
     });
 
     // 小工具們
-    function getParam(name){
-      const u = new URL(location.href);
-      return u.searchParams.get(name);
-    }
-    function setRoute(path){
-      const u = new URL(location.href);
-      if (path) u.searchParams.set('path', path); else u.searchParams.delete('path');
-      history.replaceState({}, '', u);
-    }
-    function cacheBust(){
-      return (location.hostname.endsWith('pcloud.link')? `?v=${Date.now()}` : '');
-    }
-    function escapeHtml(s){
-      return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-    }
+    function getParam(name){ const u = new URL(location.href); return u.searchParams.get(name); }
+    function setRoute(path){ const u = new URL(location.href); if (path) u.searchParams.set('path', path); else u.searchParams.delete('path'); history.replaceState({}, '', u); }
+    function cacheBust(){ return (location.hostname.endsWith('pcloud.link')? `?v=${Date.now()}` : ''); }
+    function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
   </script>
 </body>
 </html>

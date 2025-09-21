@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>家族祖譜</title>
+  <style>
+    /* ===== 風格 ===== */
+    :root{
+      --bg:#0b1220;--panel:#0f172a;--panel2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--green:#34d399;--red:#f87171;--border:#1f2a44;--hover:#15213a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif}
+    .app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:60px 1fr;min-height:100vh}
+    header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+    header h1{font-size:18px;margin:0 8px 0 0}
+    .search{flex:1;display:flex;gap:8px;align-items:center}
+    .search input{flex:1;background:#0a1223;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text)}
+    .btn{background:#0a1223;border:1px solid var(--border);padding:8px 10px;border-radius:10px;color:var(--text);cursor:pointer}
+    .btn:hover{background:#0d1830}
+
+    aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto}
+    main{background:linear-gradient(180deg,var(--panel2),var(--panel));overflow:hidden;position:relative}
+
+    /* 側欄 */
+    .side{padding:12px}
+    .section{margin-bottom:14px}
+    .section h3{margin:8px 0 6px;font-size:14px;color:var(--muted)}
+    .list{display:flex;flex-direction:column;gap:6px}
+    .chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#0a1223;cursor:pointer}
+    .chip:hover{background:var(--hover)}
+    .muted{color:var(--muted)}
+
+    /* 舞台 */
+    .stage{position:absolute;inset:0;overflow:hidden}
+    .viewport{position:absolute;left:0;top:0;transform-origin:0 0}
+    svg{display:block}
+
+    /* 節點卡片 */
+    .node{fill:#0b1326;stroke:var(--border);stroke-width:1}
+    .nodeShadow{filter:url(#shadow)}
+    .person{font-size:12px}
+    .label{font-weight:600}
+    .sub{fill:var(--muted);font-size:11px}
+    .male{stroke:#60a5fa}
+    .female{stroke:#f9a8d4}
+    .marriage{stroke:var(--muted);stroke-width:1.2}
+    .link{stroke:#334155;stroke-width:1.2}
+
+    /* 右側資訊卡 */
+    .card{position:absolute;right:12px;bottom:12px;width:320px;max-width:90vw;background:#0b1326;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .card header{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#0b1326;border-bottom:1px solid var(--border)}
+    .avatar{width:44px;height:44px;border-radius:10px;object-fit:cover;border:1px solid var(--border)}
+    .card .body{padding:12px 14px}
+    .row{display:flex;justify-content:space-between;margin:6px 0}
+
+    /* 浮動提示 */
+    .tooltip{position:fixed;pointer-events:none;background:#0b1326;border:1px solid var(--border);padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .1s}
+
+    /* 手機排版 */
+    .toggle{display:none}
+    @media (max-width: 900px){
+      .app{grid-template-columns:1fr;grid-template-rows:60px auto 1fr}
+      aside{grid-row:2;display:none}
+      aside.open{display:block}
+      .toggle{display:inline-flex}
+      header h1{display:none}
+    }
+
+    /* 列印友善 */
+    @media print{
+      header,.card,.toggle{display:none !important}
+      aside{display:none}
+      .app{grid-template-columns:1fr;grid-template-rows:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <button class="btn toggle" id="toggleSidebar">☰ 選單</button>
+      <h1>家族祖譜</h1>
+      <div class="search">
+        <input id="q" type="search" placeholder="搜尋姓名 / 字號 / 備註…" />
+        <button class="btn" id="fitBtn">適配視窗</button>
+        <button class="btn" id="resetBtn">回到根節點</button>
+      </div>
+    </header>
+
+    <aside id="sidebar">
+      <div class="side">
+        <div class="section">
+          <h3>家族分支</h3>
+          <div id="branchList" class="list"></div>
+        </div>
+        <div class="section">
+          <h3>世代快速定位</h3>
+          <div id="genList" class="list"></div>
+        </div>
+        <div class="section">
+          <h3>資料說明</h3>
+          <div class="muted">本頁為純靜態前端，資料在 <code>data.people</code> 與 <code>data.links</code>。把此檔放到 pCloud 或 GitHub Pages 即可。</div>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="stage" id="stage">
+        <div class="viewport" id="viewport">
+          <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+      <div id="tooltip" class="tooltip"></div>
+
+      <!-- 右下資訊卡 -->
+      <div class="card" id="infoCard" hidden>
+        <header>
+          <img id="avatar" class="avatar" alt="avatar" src="" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'44\' height=\'44\'%3E%3Crect width=\'100%25\' height=\'100%25\' fill=\'%230a1223\'/%3E%3C/svg%3E'">
+          <div>
+            <div id="pName" style="font-weight:700"></div>
+            <div id="pMeta" class="muted" style="font-size:12px"></div>
+          </div>
+        </header>
+        <div class="body">
+          <div class="row"><span>生卒：</span><span id="pLifespan">—</span></div>
+          <div class="row"><span>世代：</span><span id="pGen">—</span></div>
+          <div class="row"><span>配偶：</span><span id="pSpouses">—</span></div>
+          <div class="row"><span>子女：</span><span id="pChildren">—</span></div>
+          <div class="row"><span>備註：</span></div>
+          <div id="pNotes" class="muted"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  // ==============================
+  // 1) 資料（請依據你的家族修改）
+  // people: 索引為 id
+  // fields: id, name, gender('M'|'F'), birth, death, gen(第幾代), branch(分支), courtesy(字/號), notes, photo(相對路徑)
+  // links: parent->child 與 marriages（配偶對）
+  // roots: 祖先根節點（可能多個）
+  // ==============================
+  const data = {
+    people: {
+      a1:{id:'a1', name:'始祖 公', gender:'M', birth:'1750', death:'1823', gen:1, branch:'本宗', notes:'遷徙自江西。'},
+      a2:{id:'a2', name:'始祖 婦', gender:'F', birth:'1752', death:'1830', gen:1, branch:'本宗'},
+      b1:{id:'b1', name:'長子', gender:'M', birth:'1778', gen:2, branch:'長房'},
+      b2:{id:'b2', name:'次子', gender:'M', birth:'1782', gen:2, branch:'二房'},
+      b3:{id:'b3', name:'三子', gender:'M', birth:'1786', gen:2, branch:'三房'},
+      c1:{id:'c1', name:'長孫 甲', gender:'M', birth:'1805', gen:3, branch:'長房'},
+      c2:{id:'c2', name:'長孫 乙', gender:'M', birth:'1808', gen:3, branch:'長房'},
+      c3:{id:'c3', name:'次孫 甲', gender:'M', birth:'1810', gen:3, branch:'二房'},
+      c4:{id:'c4', name:'三孫 甲', gender:'M', birth:'1812', gen:3, branch:'三房'},
+      s1:{id:'s1', name:'c1之妻', gender:'F', birth:'1806', gen:3, branch:'長房'},
+    },
+    links:{
+      parentChild:[
+        ['a1','b1'],['a1','b2'],['a1','b3'],
+        ['b1','c1'],['b1','c2'],
+        ['b2','c3'],
+        ['b3','c4'],
+      ],
+      marriages:[ ['a1','a2'], ['c1','s1'] ]
+    },
+    roots:['a1']
+  };
+
+  // ==============================
+  // 2) 佈局：簡易樹狀演算法（自上而下）
+  // ==============================
+  const NODE_W=180, NODE_H=68, H_GAP=28, V_GAP=56;
+  const svg = document.getElementById('svg');
+  const viewport = document.getElementById('viewport');
+  const stage = document.getElementById('stage');
+  const tooltip = document.getElementById('tooltip');
+
+  // 建立 child 索引
+  const childrenOf = {};
+  for(const [p,c] of data.links.parentChild){
+    (childrenOf[p] ||= []).push(c);
+  }
+
+  function layoutTree(rootId){
+    // DFS 計算每個子樹的寬度
+    const pos = {}; // id -> {x,y}
+    function subtreeWidth(id){
+      const kids = childrenOf[id]||[];
+      if(kids.length===0) return NODE_W;
+      return Math.max(NODE_W, kids.map(subtreeWidth).reduce((a,b)=>a+b+H_GAP, -H_GAP));
+    }
+    const widthCache={};
+    function width(id){
+      return widthCache[id] ?? (widthCache[id]=subtreeWidth(id));
+    }
+    function place(id, x, y){
+      const w = width(id);
+      pos[id] = {x:x + (w - NODE_W)/2, y};
+      let cursor = x;
+      for(const kid of (childrenOf[id]||[])){
+        const kw = width(kid);
+        place(kid, cursor, y + NODE_H + V_GAP);
+        cursor += kw + H_GAP;
+      }
+    }
+    const totalW = width(rootId);
+    place(rootId, 0, 0);
+    return {pos, totalW, totalH: treeHeight(rootId)*(NODE_H+V_GAP)};
+  }
+
+  function treeHeight(id){
+    const kids = childrenOf[id]||[];
+    if(kids.length===0) return 1;
+    return 1 + Math.max(...kids.map(treeHeight));
+  }
+
+  // 畫出整棵樹（單根）
+  function render(rootId){
+    const {pos, totalW, totalH} = layoutTree(rootId);
+    const W = Math.max(totalW, stage.clientWidth-40);
+    const H = Math.max(totalH+NODE_H, stage.clientHeight-40);
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+
+    // 清空
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+    // defs 陰影
+    const defs = el('defs');
+    const flt = el('filter',{id:'shadow',x:'-10%',y:'-10%',width:'130%',height:'130%'});
+    flt.append(
+      el('feDropShadow',{dx:0, dy:3, stdDeviation:3, floodColor:'#000', floodOpacity:.35})
+    );
+    defs.append(flt);
+    svg.append(defs);
+
+    // 先畫連線
+    for(const [p,c] of data.links.parentChild){
+      if(!pos[p]||!pos[c]) continue;
+      const x1 = pos[p].x + NODE_W/2, y1 = pos[p].y + NODE_H;
+      const x2 = pos[c].x + NODE_W/2, y2 = pos[c].y;
+      const path = `M ${x1} ${y1} C ${x1} ${y1+20}, ${x2} ${y2-20}, ${x2} ${y2}`;
+      svg.append(el('path',{d:path, class:'link', fill:'none'}));
+    }
+
+    // 婚姻連線
+    for(const [a,b] of data.links.marriages){
+      if(!pos[a]||!pos[b]) continue;
+      const x1 = pos[a].x + NODE_W/2, y = pos[a].y + NODE_H/2;
+      const x2 = pos[b].x + NODE_W/2;
+      svg.append(el('line',{x1, y1:y, x2, y2:y, class:'marriage'}));
+    }
+
+    // 再畫節點
+    for(const id in pos){
+      const p = data.people[id];
+      const g = el('g', {transform:`translate(${pos[id].x},${pos[id].y})`, 'data-id':id});
+      const rect = el('rect', {rx:12, ry:12, width:NODE_W, height:NODE_H, class:`node nodeShadow ${p.gender==='M'?'male':'female'}`});
+      g.append(rect);
+
+      // 姓名
+      const name = el('text', {x:12, y:22, class:'person label'});
+      name.textContent = p.name;
+      g.append(name);
+      // 其次資訊
+      const meta = [p.courtesy?`字號：${p.courtesy}`:null, p.branch?`分支：${p.branch}`:null].filter(Boolean).join('  ');
+      const sub = el('text', {x:12, y:40, class:'person sub'});
+      sub.textContent = meta || (p.gender==='M'?'男':'女');
+      g.append(sub);
+      // 生卒
+      const life = el('text', {x:12, y:58, class:'person sub'});
+      life.textContent = (p.birth||'？') + (p.death?`—${p.death}`:'');
+      g.append(life);
+
+      // 互動
+      g.addEventListener('mouseenter', (ev)=> showTip(ev, `${p.name}`));
+      g.addEventListener('mouseleave', hideTip);
+      g.addEventListener('click', ()=> selectPerson(id));
+
+      svg.append(g);
+    }
+  }
+
+  // DOM 小工具
+  function el(tag, attrs={}){ const n=document.createElementNS('http://www.w3.org/2000/svg', tag); for(const k in attrs){ n.setAttribute(k, attrs[k]); } return n; }
+
+  // ==============================
+  // 3) 互動：平移縮放、選取人員、搜尋
+  // ==============================
+  let scale=1, offsetX=20, offsetY=20, dragging=false, lastX=0, lastY=0;
+  function applyTransform(){
+    viewport.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  }
+  stage.addEventListener('mousedown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;});
+  window.addEventListener('mouseup', ()=> dragging=false);
+  window.addEventListener('mousemove', e=>{ if(!dragging) return; offsetX += e.clientX-lastX; offsetY += e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; applyTransform(); });
+  stage.addEventListener('wheel', e=>{ e.preventDefault(); const factor = (e.deltaY>0)?0.9:1.1; const rect=stage.getBoundingClientRect(); const cx=e.clientX-rect.left-offsetX, cy=e.clientY-rect.top-offsetY; offsetX = e.clientX-rect.left - (cx*factor); offsetY = e.clientY-rect.top - (cy*factor); scale *= factor; scale=Math.min(2.5, Math.max(0.4, scale)); applyTransform(); }, {passive:false});
+
+  function fitToScreen(){
+    // 讓整棵樹置中顯示
+    const bbox = svg.getBBox();
+    const vw = stage.clientWidth-40, vh=stage.clientHeight-40;
+    const sx = vw / bbox.width, sy = vh / bbox.height; const s = Math.max(0.5, Math.min(1.6, Math.min(sx, sy)));
+    scale = s; offsetX = (stage.clientWidth - bbox.width*s)/2 - bbox.x*s; offsetY = 20 - bbox.y*s; applyTransform();
+  }
+
+  function resetToRoot(){
+    const root = data.roots[0];
+    render(root); setHash(root); setTimeout(fitToScreen, 0);
+  }
+
+  // 選取人員 → 右下資訊卡
+  function selectPerson(id){
+    const p = data.people[id]; if(!p) return;
+    document.getElementById('infoCard').hidden = false;
+    document.getElementById('avatar').src = p.photo || `photos/${id}.jpg`;
+    document.getElementById('pName').textContent = p.name;
+    document.getElementById('pMeta').textContent = [p.branch, (p.gender==='M'?'男':'女'), p.courtesy?('字號:'+p.courtesy):null].filter(Boolean).join(' · ');
+    document.getElementById('pLifespan').textContent = (p.birth||'？') + (p.death?`—${p.death}`:'');
+    document.getElementById('pGen').textContent = p.gen?`${p.gen} 世`:'—';
+
+    const spouses = (data.links.marriages||[]).flatMap(([a,b])=> (a===id?[b]:b===id?[a]:[])).map(id=> data.people[id]?.name).filter(Boolean);
+    document.getElementById('pSpouses').textContent = spouses.length? spouses.join('、'):'—';
+
+    const children = (childrenOf[id]||[]).map(cid=> data.people[cid]?.name).filter(Boolean);
+    document.getElementById('pChildren').textContent = children.length? children.join('、'):'—';
+
+    document.getElementById('pNotes').textContent = p.notes||'';
+  }
+
+  // Tooltip
+  function showTip(ev, text){ tooltip.textContent=text; tooltip.style.left=(ev.clientX+10)+'px'; tooltip.style.top=(ev.clientY+10)+'px'; tooltip.style.opacity=1; }
+  function hideTip(){ tooltip.style.opacity=0; }
+
+  // 搜尋
+  const q = document.getElementById('q');
+  q.addEventListener('input', ()=>{
+    const s = q.value.trim(); if(!s){ hideHighlight(); return; }
+    highlightByText(s);
+  });
+  function highlightByText(s){
+    const terms = s.toLowerCase().split(/\s+/).filter(Boolean);
+    const groups = Array.from(svg.querySelectorAll('g[data-id]'));
+    groups.forEach(g=>{ const id=g.getAttribute('data-id'); const p=data.people[id]; const text=[p.name,p.courtesy,p.branch,p.notes].filter(Boolean).join(' ').toLowerCase(); const hit = terms.every(t=> text.includes(t)); g.style.opacity = hit?1:0.25; g.querySelector('rect').style.stroke = hit? 'var(--accent)':'var(--border)'; });
+  }
+  function hideHighlight(){ Array.from(svg.querySelectorAll('g[data-id]')).forEach(g=>{ g.style.opacity=1; g.querySelector('rect').style.stroke = ''; }); }
+
+  // 側欄：分支與世代
+  function buildSide(){
+    const branchSet = new Set(Object.values(data.people).map(p=>p.branch).filter(Boolean));
+    const branchList = document.getElementById('branchList');
+    branchList.innerHTML='';
+    for(const b of Array.from(branchSet).sort()){
+      const div = document.createElement('div');
+      div.className='chip';
+      div.textContent = b;
+      div.onclick = ()=>{ q.value=b; highlightByText(b); };
+      branchList.appendChild(div);
+    }
+    const gens = new Set(Object.values(data.people).map(p=>p.gen).filter(Boolean));
+    const genList = document.getElementById('genList');
+    genList.innerHTML='';
+    for(const g of Array.from(gens).sort((a,b)=>a-b)){
+      const div = document.createElement('div');
+      div.className='chip';
+      div.textContent = `${g} 世`;
+      div.onclick = ()=>{ q.value=`${g} 世`; highlightByText(`${g}`); };
+      genList.appendChild(div);
+    }
+  }
+
+  // Hash 連結與初始
+  function setHash(id){ location.hash = '#'+id; }
+  function getHash(){ return (location.hash||'').replace('#',''); }
+
+  // 事件 / 控制
+  document.getElementById('fitBtn').onclick = fitToScreen;
+  document.getElementById('resetBtn').onclick = resetToRoot;
+  document.getElementById('toggleSidebar').onclick = ()=> document.getElementById('sidebar').classList.toggle('open');
+
+  // 初始渲染
+  (function init(){
+    buildSide();
+    const id = getHash() || data.roots[0];
+    render(id); setTimeout(fitToScreen, 0);
+  })();
+
+  // 監聽 hash 變更（可支援分享連結）
+  window.addEventListener('hashchange', ()=>{ const id=getHash(); if(data.people[id]){ render(id); setTimeout(fitToScreen, 0);} });
+  </script>
+</body>
+</html>

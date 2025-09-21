@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Python 筆記</title>
+<style>
+body{margin:0;background:#0b1326;color:#e5e7eb;font:16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans TC", sans-serif}
+.wrap{max-width:900px;margin:28px auto;padding:0 20px}
+h1{font-size:28px;margin:0 0 12px}
+pre{background:#0a1223;border:1px solid #1f2a44;border-radius:12px;padding:12px;overflow:auto}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+ul{margin:6px 0 0 20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Python 筆記</h1>
+<p>紀錄常用語法與工具（pandas、matplotlib、requests）。</p>
+<h3>範例：讀檔 + 統計</h3>
+<pre><code>from collections import Counter
+words = open('readme.txt', encoding='utf-8').read().split()
+print(Counter(words).most_common(10))
+</code></pre>
+<ul>
+<li>環境管理（venv/conda）</li>
+<li>檔案/資料處理</li>
+<li>爬蟲/自動化</li>
+</ul>
+</div>
+</body>
+</html>
