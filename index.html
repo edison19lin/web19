@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的文章庫</title>
+  <style>
+    :root{
+      --bg:#0b1220;--panel:#0f172a;--panel-2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--border:#1f2a44;--hover:#15213a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif}
+    .app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+    header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+    header h1{font-size:18px;margin:0;font-weight:600}
+    header .search{flex:1;max-width:720px;display:flex;gap:8px}
+    input[type="search"]{flex:1;background:#0a1223;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text)}
+    .wrap{display:flex;min-height:0}
+    aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto}
+    main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:auto}
+
+    /* Tree */
+    .tree{list-style:none;margin:0;padding:8px}
+    .node{margin:2px 0;border-radius:10px}
+    .node>.row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer}
+    .node>.row:hover{background:var(--hover)}
+    .caret{transition:transform .2s ease}
+    .collapsed>.row .caret{transform:rotate(-90deg)}
+    .children{margin-left:20px;padding-left:8px;border-left:1px dashed var(--border)}
+    .children.collapsed{display:none}
+    .title{flex:1}
+    .badge{font-size:12px;color:var(--muted)}
+    .file{display:flex;align-items:center;gap:8px;padding:6px 12px;margin:2px 0;border-radius:10px;cursor:pointer}
+    .file:hover{background:var(--hover)}
+    .file.active{background:rgba(96,165,250,.15);outline:1px solid rgba(96,165,250,.35)}
+
+    /* Content */
+    .content{max-width:900px;margin:24px auto;padding:0 24px}
+    .breadcrumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
+    .breadcrumbs a{color:var(--muted);text-decoration:none}
+    .breadcrumbs a:hover{color:var(--text)}
+    h2.article-title{margin:8px 0 16px;font-size:26px}
+    article{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    article img{max-width:100%;border-radius:8px}
+    article pre{overflow:auto;background:#0a1223;border:1px solid var(--border);padding:12px;border-radius:10px}
+    article code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace}
+
+    /* Toolbar */
+    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:6px 0 16px}
+    .btn{background:#0a1223;border:1px solid var(--border);padding:8px 10px;border-radius:10px;color:var(--text);cursor:pointer}
+    .btn:hover{background:#0d1830}
+
+    /* Responsive */
+    .toggle{display:none}
+    @media (max-width: 900px){
+      .app{grid-template-columns:1fr;grid-template-rows:56px auto 1fr}
+      aside{grid-row:2;display:none}
+      aside.open{display:block}
+      .toggle{display:inline-flex;margin-right:6px}
+      header{gap:8px}
+      header h1{display:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <button class="btn toggle" id="toggleSidebar" aria-label="開關選單">☰ 選單</button>
+      <h1>文章庫</h1>
+      <div class="search">
+        <input id="searchInput" type="search" placeholder="搜尋分類或文章標題…" />
+      </div>
+      <button class="btn" id="expandAll">展開</button>
+      <button class="btn" id="collapseAll">收合</button>
+    </header>
+
+    <aside id="sidebar">
+      <ul class="tree" id="treeRoot"></ul>
+    </aside>
+
+    <main>
+      <div class="content">
+        <div class="breadcrumbs" id="breadcrumbs">首頁</div>
+        <h2 class="article-title" id="articleTitle">歡迎！</h2>
+        <div class="toolbar">
+          <button class="btn" id="openRaw">在新分頁開啟原始檔</button>
+          <button class="btn" id="copyLink">複製目前連結</button>
+        </div>
+        <article id="article">
+          <p>左側是「類檔案總管」的選單。點分類可展開，點文章會在這裡載入內容。</p>
+          <p>你可以把文章寫成 <strong>.html</strong> 檔放在 <code>/articles</code> 資料夾，然後只要改下面的 <code>manifest</code> 就行了。</p>
+          <pre><code>articles/
+  getting-started.html
+  web/pcloud-deploy.html
+  life/reading-notes.html
+</code></pre>
+        </article>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // === 1) 站點清單（你只要改這裡）=========================================
+    // type Manifest = Array<Category>
+    // type Category = { name: string, children: Array<Category|Item> }
+    // type Item = { title: string, path: string }
+    const manifest = [
+      {
+        name: "入門",
+        children: [
+          { title: "開始使用本模板", path: "articles/getting-started.html" },
+          { title: "如何上傳到 pCloud", path: "articles/pcloud-deploy.html" },
+        ],
+      },
+      {
+        name: "Web 開發",
+        children: [
+          { title: "排版與框架選擇", path: "articles/layout-frameworks.html" },
+          { title: "小技巧：圖片最佳化", path: "articles/image-optim.html" },
+        ],
+      },
+      {
+        name: "生活記錄",
+        children: [
+          {
+            name: "讀書摘錄",
+            children: [
+              { title: "原子習慣筆記", path: "articles/life/atomic-habits.html" },
+              { title: "深度工作重點", path: "articles/life/deep-work.html" },
+            ],
+          },
+        ],
+      },
+    ];
+
+    // === 2) UI 建置 ==========================================================
+    const treeRoot = document.getElementById('treeRoot');
+    const article = document.getElementById('article');
+    const articleTitle = document.getElementById('articleTitle');
+    const breadcrumbs = document.getElementById('breadcrumbs');
+    const openRawBtn = document.getElementById('openRaw');
+    const copyLinkBtn = document.getElementById('copyLink');
+    const sidebar = document.getElementById('sidebar');
+
+    function createCategoryNode(cat, pathTrail=[]) {
+      const li = document.createElement('li');
+      li.className = 'node';
+      li.dataset.type = 'category';
+
+      const row = document.createElement('div');
+      row.className = 'row';
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.textContent = '▾';
+      const folder = document.createElement('span');
+      folder.textContent = '📂';
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = cat.name;
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = countItems(cat);
+
+      row.append(caret, folder, title, badge);
+      li.appendChild(row);
+
+      const ul = document.createElement('ul');
+      ul.className = 'children';
+      (cat.children||[]).forEach(ch => {
+        if (ch.path) ul.appendChild(createFileNode(ch, [...pathTrail, cat.name]));
+        else ul.appendChild(createCategoryNode(ch, [...pathTrail, cat.name]));
+      });
+      li.appendChild(ul);
+
+      row.addEventListener('click', () => {
+        ul.classList.toggle('collapsed');
+        li.classList.toggle('collapsed');
+      });
+      return li;
+    }
+
+    function createFileNode(item, pathTrail=[]) {
+      const li = document.createElement('li');
+      li.className = 'file';
+      li.dataset.type = 'file';
+      li.dataset.title = item.title;
+      li.dataset.path = item.path;
+      li.dataset.trail = JSON.stringify(pathTrail);
+
+      const icon = document.createElement('span');
+      icon.textContent = '📄';
+      const span = document.createElement('span');
+      span.className = 'title';
+      span.textContent = item.title;
+      li.append(icon, span);
+
+      li.addEventListener('click', () => {
+        document.querySelectorAll('.file.active').forEach(n=>n.classList.remove('active'));
+        li.classList.add('active');
+        loadArticle(item.title, item.path, pathTrail);
+        if (window.innerWidth < 900) sidebar.classList.remove('open');
+      });
+      return li;
+    }
+
+    function countItems(node){
+      if (node.path) return 1;
+      return (node.children||[]).reduce((a,n)=>a+countItems(n),0);
+    }
+
+    function buildTree(){
+      treeRoot.innerHTML='';
+      manifest.forEach(cat=> treeRoot.appendChild(createCategoryNode(cat)));
+    }
+
+    // === 3) 載入文章 + 導覽 ==================================================
+    async function loadArticle(title, path, trail){
+      setRoute(path);
+      breadcrumbs.innerHTML = ['<a href="#" data-home>首頁</a>']
+        .concat(trail.map(t=>`<span> / </span><span>${escapeHtml(t)}</span>`))
+        .concat([`<span> / </span><span>${escapeHtml(title)}</span>`])
+        .join('');
+      articleTitle.textContent = title;
+      openRawBtn.onclick = ()=> window.open(path, '_blank');
+      copyLinkBtn.onclick = ()=>{
+        navigator.clipboard.writeText(location.href).then(()=>{
+          copyLinkBtn.textContent = '已複製！';
+          setTimeout(()=>copyLinkBtn.textContent='複製目前連結',1000);
+        });
+      }
+      try{
+        const res = await fetch(path + cacheBust());
+        const html = await res.text();
+        article.innerHTML = html;
+      }catch(e){
+        article.innerHTML = `<p style="color:#fca5a5">無法載入文章：${escapeHtml(String(e))}</p>`;
+      }
+    }
+
+    // 路由：支援網址 ?path=articles/xxx.html 直接開啟
+    function getParam(name){
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    function setRoute(path){
+      const u = new URL(location.href);
+      if (path) u.searchParams.set('path', path); else u.searchParams.delete('path');
+      history.replaceState({}, '', u);
+    }
+    function cacheBust(){
+      return (location.hostname.endsWith('pcloud.link')? `?v=${Date.now()}` : '');
+    }
+
+    // === 4) 搜尋（即時過濾） =================================================
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', ()=>{
+      const q = searchInput.value.trim().toLowerCase();
+      filterTree(q);
+    });
+
+    function filterTree(q){
+      // 顯示包含關鍵字的節點，並展開其父層
+      const files = treeRoot.querySelectorAll('.file');
+      files.forEach(li=>{
+        const match = li.dataset.title.toLowerCase().includes(q);
+        li.style.display = match? 'flex':'none';
+        if(match){
+          let p = li.parentElement; // ul.children
+          while(p && p.id !== 'treeRoot'){
+            if(p.classList.contains('children')) p.classList.remove('collapsed');
+            const node = p.parentElement; // li.node
+            node && node.classList.remove('collapsed');
+            p = node && node.parentElement;
+          }
+        }
+      });
+    }
+
+    // === 5) 初始化 ============================================================
+    buildTree();
+
+    // 如果網址有指定 path，就直接載入
+    const startPath = getParam('path');
+    if (startPath){
+      // 找到對應的標題 & trail
+      function findItem(nodes, trail=[]){
+        for(const n of nodes){
+          if(n.path && n.path===startPath) return {title:n.title, trail};
+          if(n.children){
+            const f = findItem(n.children, [...trail,n.name]);
+            if(f) return f;
+          }
+        }
+        return null;
+      }
+      const found = findItem(manifest);
+      if(found){
+        loadArticle(found.title, startPath, found.trail);
+        // 同步選單 active
+        const target = [...document.querySelectorAll('.file')].find(li=>li.dataset.path===startPath);
+        target && target.classList.add('active');
+      }
+    }
+
+    // 展開/收合全部
+    document.getElementById('expandAll').onclick = ()=>{
+      document.querySelectorAll('.children').forEach(ul=>ul.classList.remove('collapsed'));
+      document.querySelectorAll('.node').forEach(li=>li.classList.remove('collapsed'));
+    }
+    document.getElementById('collapseAll').onclick = ()=>{
+      document.querySelectorAll('.children').forEach(ul=>ul.classList.add('collapsed'));
+      document.querySelectorAll('.node').forEach(li=>li.classList.add('collapsed'));
+    }
+
+    // 手機開關側欄
+    document.getElementById('toggleSidebar').onclick = ()=>{
+      sidebar.classList.toggle('open');
+    }
+
+    // 點擊麵包屑回首頁
+    breadcrumbs.addEventListener('click', (e)=>{
+      const a = e.target.closest('a[data-home]');
+      if(!a) return;
+      e.preventDefault();
+      setRoute(null);
+      articleTitle.textContent = '歡迎！';
+      breadcrumbs.textContent = '首頁';
+      article.innerHTML = '<p>選單中選擇一篇文章開始閱讀。</p>';
+      document.querySelectorAll('.file.active').forEach(n=>n.classList.remove('active'));
+    });
+
+    function escapeHtml(s){
+      return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+  </script>
+</body>
+</html>
