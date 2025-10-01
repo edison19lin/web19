@@ -1,0 +1,51 @@
+:root {
+  --bg:#0b1326; --panel:#0a1223; --text:#e5e7eb; --muted:#9ca3af;
+  --border:#1f2a44; --radius:12px;
+}
+
+/* 讓 iframe 內頁不出現滾動條，靠父頁 JS 撐高 */
+html, body {
+  height:auto;
+  margin:0;
+  padding:0;
+  /* overflow-x:hidden;
+  overflow-y:hidden; */
+  background:var(--bg);
+  color:var(--text);
+  font:16px/1.7 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif;
+}
+
+/* 文章容器：統一 95% */
+.article {
+  width:95%;
+  max-width:none;
+  margin:28px auto;
+  padding:0;
+  box-sizing:border-box;
+}
+
+h1 { font-size:28px; margin:0 0 12px }
+h3 { font-size:18px; margin:18px 0 10px; color:var(--text) }
+p { margin:0 0 12px }
+ul { margin:6px 0 0 22px }
+
+/* 程式碼樣式 */
+code, pre {
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  font-size:14px;
+}
+pre {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px;
+  overflow:auto;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+}
+
+/* 小螢幕微調 */
+@media (max-width:560px){
+  h1 { font-size:24px }
+  h3 { font-size:17px }
+  .article { margin:20px auto }
+}

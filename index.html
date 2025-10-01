@@ -8,7 +8,11 @@
     :root{ --bg:#0b1220;--panel:#0f172a;--panel-2:#0c1427;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--border:#1f2a44;--hover:#15213a; }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif
+    }
+
     .app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
     header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
     header h1{font-size:18px;margin:0;font-weight:600}
@@ -32,8 +36,13 @@
     .file:hover{background:var(--hover)}
     .file.active{background:rgba(96,165,250,.15);outline:1px solid rgba(96,165,250,.35)}
 
-    /* Content */
-    .content{max-width:900px;margin:24px auto;padding:0 24px}
+    /* Content：文章區改為佔 95% 寬 */
+    .content{
+      width:95%;
+      max-width:none;
+      margin:24px auto;
+      padding:0;
+    }
     .breadcrumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
     .breadcrumbs a{color:var(--muted);text-decoration:none}
     .breadcrumbs a:hover{color:var(--text)}
@@ -43,8 +52,17 @@
     .btn:hover{background:#0d1830}
 
     /* Iframe container */
-    #articleFrame{width:100%;border:0;min-height:420px;background:#0b1326;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    #articleFrame{
+      width:100%;border:0;min-height:420px;background:#0b1326;
+      border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);
+      overflow:hidden; /* 避免顯示 iframe 捲軸，靠 JS 自動撐高 */
+    }
     .welcome{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+    /* ===== 隱藏側欄狀態（桌機/手機通用） ===== */
+    body.sidebar-hidden aside{ display:none; }
+    body.sidebar-hidden .app{ grid-template-columns:1fr; }
+    #hideSidebarBtn{ display:inline-flex; }
 
     /* Responsive */
     .toggle{display:none}
@@ -68,6 +86,7 @@
       </div>
       <button class="btn" id="expandAll">展開</button>
       <button class="btn" id="collapseAll">收合</button>
+      <button class="btn" id="hideSidebarBtn" aria-expanded="true" aria-controls="sidebar">隱藏選單</button>
     </header>
 
     <aside id="sidebar">
@@ -224,6 +243,16 @@ notes/
         // 同網域時自動高度
         try {
           const doc = frame.contentWindow.document;
+
+          // 確保內頁不顯示自身捲軸（只靠外層撐高）
+          try{
+            doc.documentElement.style.overflowY = 'hidden';
+            doc.body.style.overflowY = 'hidden';
+            doc.documentElement.style.overflowX = 'hidden';
+            doc.body.style.overflowX = 'hidden';
+            doc.body.style.margin = '0';
+          }catch(_e){}
+
           const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
           frame.style.height = Math.max(420, h + 20) + 'px';
         } catch (e) {
@@ -246,14 +275,12 @@ notes/
     }
 
     // ===== Disqus：依目前文章重設 ===========================================
-    // 先提供全域 disqus_config（必須在 embed.js 載入前定義）
     window.disqus_config = function () {
       this.page.url = location.href;
       this.page.identifier = window.currentPath || 'home';
     };
     const DISQUS_SHORTNAME = 'edison19lin'; // ← 改成你的 Disqus 短名稱
     (function(){
-      // 初次載入 Disqus 腳本
       const d = document, s = d.createElement('script');
       s.src = 'https://' + DISQUS_SHORTNAME + '.disqus.com/embed.js';
       s.setAttribute('data-timestamp', +new Date());
@@ -270,7 +297,6 @@ notes/
           }
         });
       } else {
-        // 若腳本尚未就緒，稍後再試一次
         setTimeout(()=> updateDisqus(pageUrl, identifier), 400);
       }
     }
@@ -299,8 +325,49 @@ notes/
       });
     }
 
-    // ===== 5) 初始化 =========================================================
+    // ===== A) 側欄顯示/隱藏（桌機+手機通用） ===============================
+    function setSidebarHidden(hidden){
+      document.body.classList.toggle('sidebar-hidden', hidden);
+      const btn = document.getElementById('hideSidebarBtn');
+      if (btn){
+        btn.textContent = hidden ? '顯示選單' : '隱藏選單';
+        btn.setAttribute('aria-expanded', String(!hidden));
+      }
+      try{ localStorage.setItem('sidebarHidden', hidden ? '1' : '0'); }catch(e){}
+    }
+    function toggleSidebarHidden(){
+      const nowHidden = !document.body.classList.contains('sidebar-hidden');
+      setSidebarHidden(nowHidden);
+    }
+    // 讀取記憶狀態
+    (function restoreSidebarState(){
+      try{
+        const saved = localStorage.getItem('sidebarHidden');
+        if (saved === '1') setSidebarHidden(true);
+      }catch(e){}
+    })();
+
+    // ===== 5) 初始化 ========================================================
     buildTree();
+
+    // 綁定「隱藏/顯示選單」按鈕
+    document.getElementById('hideSidebarBtn').onclick = toggleSidebarHidden;
+
+    // 手機用的漢堡鍵（切換側欄展開/收合）
+    document.getElementById('toggleSidebar').onclick = ()=>{
+      // 若桌機模式被隱藏，先恢復顯示（避免開不到）
+      if (document.body.classList.contains('sidebar-hidden')) setSidebarHidden(false);
+      sidebar.classList.toggle('open');
+    };
+
+    // 鍵盤快速鍵：按下 "s" 切換側欄（避免在輸入框觸發）
+    window.addEventListener('keydown', (e)=>{
+      const tag = (e.target.tagName||'').toLowerCase();
+      if (e.key.toLowerCase() === 's' && !/input|textarea/.test(tag)){
+        e.preventDefault();
+        toggleSidebarHidden();
+      }
+    });
 
     // 如果網址有指定 path，就直接載入
     const startPath = getParam('path');
@@ -331,11 +398,6 @@ notes/
     document.getElementById('collapseAll').onclick = ()=>{
       document.querySelectorAll('.children').forEach(ul=>ul.classList.add('collapsed'));
       document.querySelectorAll('.node').forEach(li=>li.classList.add('collapsed'));
-    }
-
-    // 手機開關側欄
-    document.getElementById('toggleSidebar').onclick = ()=>{
-      sidebar.classList.toggle('open');
     }
 
     // 點擊麵包屑回首頁

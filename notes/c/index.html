@@ -1,37 +1,36 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>C 語言筆記</title>
-<style>
-body{margin:0;background:#0b1326;color:#e5e7eb;font:16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans TC", sans-serif}
-.wrap{max-width:900px;margin:28px auto;padding:0 20px}
-h1{font-size:28px;margin:0 0 12px}
-pre{background:#0a1223;border:1px solid #1f2a44;border-radius:12px;padding:12px;overflow:auto}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-ul{margin:6px 0 0 20px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C 語言筆記</title>
+  <link rel="stylesheet" href="../../common.css">
 </head>
 <body>
-<div class="wrap">
-<h1>C 語言筆記</h1>
-<p>放常用語法、樣板、實作範例。</p>
-<h3>範例：字串反轉</h3>
-<pre><code>#include <stdio.h>
-#include <string.h>
-int main(){
-char s[256];
-scanf("%255s", s);
-for(int i=strlen(s)-1; i>=0; --i) putchar(s[i]);
-return 0;
+  <div class="article">
+    <h1>C 語言筆記</h1>
+    <p>放常用語法、樣板、實作範例。</p>
+
+    <h3>範例：字串反轉</h3>
+    <pre><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main(void) {
+    char s[256];
+    if (scanf("%255s", s) != 1) return 1;
+    for (int i = (int)strlen(s) - 1; i &gt;= 0; --i) {
+        putchar(s[i]);
+    }
+    putchar('\n');
+    return 0;
 }
 </code></pre>
-<ul>
-<li>檔案讀寫</li>
-<li>指標與記憶體</li>
-<li>字串處理</li>
-</ul>
-</div>
+
+    <ul>
+      <li>檔案讀寫</li>
+      <li>指標與記憶體</li>
+      <li>字串處理</li>
+    </ul>
+  </div>
 </body>
 </html>
