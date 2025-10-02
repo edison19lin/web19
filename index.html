@@ -17,7 +17,7 @@
     .app{
       display:grid;
       grid-template-columns:280px 1fr;
-      grid-template-rows:56px auto; /* ← 改為 auto */
+      grid-template-rows:56px auto;
       min-height:100vh;
     }
     header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1100}
@@ -25,7 +25,7 @@
     header .search{flex:1;max-width:720px;display:flex;gap:8px}
     input[type="search"]{flex:1;background:#0a1223;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text)}
     aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto}
-    main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:visible} /* ← 改為 visible */
+    main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:visible}
 
     /* Tree */
     .tree{list-style:none;margin:0;padding:8px}
@@ -54,7 +54,7 @@
 
     /* Iframe container */
     #articleFrame{
-      width:100%;border:0;min-height:420px;background:#0b1326;
+      width:100%;border:0;min-height:1000px;background:#0b1326;
       border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);
       overflow:hidden; /* 避免顯示 iframe 捲軸，靠 JS 自動撐高 */
       display:none;
@@ -64,6 +64,18 @@
     /* ===== 隱藏側欄狀態（僅桌機套用） ===== */
     @media (min-width: 901px){
       body.sidebar-hidden aside{ display:none; }
+
+      /* 讓 main 跨兩欄佔滿，但保留 padding-left 280px，避免內容寬度錯位 */
+      body.sidebar-hidden main{
+        margin-left:20px;
+	padding-left:8px;
+      }
+
+      body.sidebar-hidden .content{
+        width: 95vw;
+        margin-left:0;
+        margin-right:auto;
+      }
     }
 
     /* Responsive：手機抽屜化 */
@@ -72,11 +84,11 @@
       .app{grid-template-columns:1fr;grid-template-rows:56px auto 1fr}
       aside{grid-row:2;display:none}
       aside.open{
-        display:block !important;      /* 強制顯示 */
-        position:fixed;                /* 抽屜定位 */
+        display:block !important;
+        position:fixed;
         top:56px; left:0; bottom:0;
         width:80vw; max-width:320px;
-        z-index:1000;                  /* 蓋過 main */
+        z-index:1000;
         overflow:auto;
       }
       .toggle{display:inline-flex;margin-right:6px}
