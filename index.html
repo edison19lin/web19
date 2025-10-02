@@ -13,13 +13,19 @@
       font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans TC",sans-serif
     }
 
-    .app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
-    header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+    /* 版面：第二列改為 auto，讓內容自然增高；交給整頁滾動 */
+    .app{
+      display:grid;
+      grid-template-columns:280px 1fr;
+      grid-template-rows:56px auto; /* ← 改為 auto */
+      min-height:100vh;
+    }
+    header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1100}
     header h1{font-size:18px;margin:0;font-weight:600}
     header .search{flex:1;max-width:720px;display:flex;gap:8px}
     input[type="search"]{flex:1;background:#0a1223;border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text)}
     aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto}
-    main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:auto}
+    main{background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:visible} /* ← 改為 visible */
 
     /* Tree */
     .tree{list-style:none;margin:0;padding:8px}
@@ -36,13 +42,8 @@
     .file:hover{background:var(--hover)}
     .file.active{background:rgba(96,165,250,.15);outline:1px solid rgba(96,165,250,.35)}
 
-    /* Content：文章區改為佔 95% 寬 */
-    .content{
-      width:95%;
-      max-width:none;
-      margin:24px auto;
-      padding:0;
-    }
+    /* Content：文章區佔 95% 寬 */
+    .content{width:95%;max-width:none;margin:24px auto;padding:0}
     .breadcrumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
     .breadcrumbs a{color:var(--muted);text-decoration:none}
     .breadcrumbs a:hover{color:var(--text)}
@@ -56,20 +57,28 @@
       width:100%;border:0;min-height:420px;background:#0b1326;
       border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);
       overflow:hidden; /* 避免顯示 iframe 捲軸，靠 JS 自動撐高 */
+      display:none;
     }
     .welcome{background:#0b1326;border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 
-    /* ===== 隱藏側欄狀態（桌機/手機通用） ===== */
-    body.sidebar-hidden aside{ display:none; }
-    body.sidebar-hidden .app{ grid-template-columns:1fr; }
-    #hideSidebarBtn{ display:inline-flex; }
+    /* ===== 隱藏側欄狀態（僅桌機套用） ===== */
+    @media (min-width: 901px){
+      body.sidebar-hidden aside{ display:none; }
+    }
 
-    /* Responsive */
+    /* Responsive：手機抽屜化 */
     .toggle{display:none}
     @media (max-width: 900px){
       .app{grid-template-columns:1fr;grid-template-rows:56px auto 1fr}
       aside{grid-row:2;display:none}
-      aside.open{display:block}
+      aside.open{
+        display:block !important;      /* 強制顯示 */
+        position:fixed;                /* 抽屜定位 */
+        top:56px; left:0; bottom:0;
+        width:80vw; max-width:320px;
+        z-index:1000;                  /* 蓋過 main */
+        overflow:auto;
+      }
       .toggle{display:inline-flex;margin-right:6px}
       header{gap:8px}
       header h1{display:none}
@@ -79,7 +88,7 @@
 <body>
   <div class="app">
     <header>
-      <button class="btn toggle" id="toggleSidebar" aria-label="開關選單">☰ 選單</button>
+      <button class="btn toggle" id="toggleSidebar" aria-label="開關選單" aria-expanded="false" aria-controls="sidebar">☰ 選單</button>
       <h1>文章庫</h1>
       <div class="search">
         <input id="searchInput" type="search" placeholder="搜尋分類或文章標題…" />
@@ -116,7 +125,7 @@ notes/
         </div>
 
         <!-- 文章 iframe：選擇文章後才會顯示 -->
-        <iframe id="articleFrame" title="文章內容" style="display:none"></iframe>
+        <iframe id="articleFrame" title="文章內容"></iframe>
 
         <!-- Disqus 留言（會依目前文章 path 重設） -->
         <div id="disqus_thread" style="margin-top:24px;"></div>
@@ -254,9 +263,9 @@ notes/
           }catch(_e){}
 
           const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
-          frame.style.height = Math.max(420, h + 20) + 'px';
+          frame.style.height = (h + 20) + 'px'; // 不設下限，完全依內容撐高
         } catch (e) {
-          // 跨網域：給個視窗高度
+          // 跨網域：退而求其次給個視窗高度
           frame.style.height = '80vh';
         }
       };
@@ -325,7 +334,7 @@ notes/
       });
     }
 
-    // ===== A) 側欄顯示/隱藏（桌機+手機通用） ===============================
+    // ===== A) 側欄顯示/隱藏（桌機+手機分流） ===============================
     function setSidebarHidden(hidden){
       document.body.classList.toggle('sidebar-hidden', hidden);
       const btn = document.getElementById('hideSidebarBtn');
@@ -339,7 +348,7 @@ notes/
       const nowHidden = !document.body.classList.contains('sidebar-hidden');
       setSidebarHidden(nowHidden);
     }
-    // 讀取記憶狀態
+    // 讀取記憶狀態（僅影響桌機視圖）
     (function restoreSidebarState(){
       try{
         const saved = localStorage.getItem('sidebarHidden');
@@ -347,18 +356,28 @@ notes/
       }catch(e){}
     })();
 
-    // ===== 5) 初始化 ========================================================
-    buildTree();
-
-    // 綁定「隱藏/顯示選單」按鈕
+    // 綁定「隱藏/顯示選單」（桌機）
     document.getElementById('hideSidebarBtn').onclick = toggleSidebarHidden;
 
     // 手機用的漢堡鍵（切換側欄展開/收合）
-    document.getElementById('toggleSidebar').onclick = ()=>{
+    document.getElementById('toggleSidebar').onclick = (e)=>{
+      e.preventDefault();
       // 若桌機模式被隱藏，先恢復顯示（避免開不到）
       if (document.body.classList.contains('sidebar-hidden')) setSidebarHidden(false);
-      sidebar.classList.toggle('open');
+      const isOpen = sidebar.classList.toggle('open');
+      const btn = e.currentTarget;
+      btn.setAttribute('aria-expanded', String(isOpen));
+      btn.setAttribute('aria-controls', 'sidebar');
     };
+
+    // 點 main 空白處關閉抽屜（僅手機寬度時）
+    document.querySelector('main').addEventListener('click', ()=>{
+      if (window.innerWidth <= 900 && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        const btn = document.getElementById('toggleSidebar');
+        btn && btn.setAttribute('aria-expanded', 'false');
+      }
+    });
 
     // 鍵盤快速鍵：按下 "s" 切換側欄（避免在輸入框觸發）
     window.addEventListener('keydown', (e)=>{
@@ -368,6 +387,9 @@ notes/
         toggleSidebarHidden();
       }
     });
+
+    // ===== 5) 初始化 ========================================================
+    buildTree();
 
     // 如果網址有指定 path，就直接載入
     const startPath = getParam('path');
